@@ -121,7 +121,7 @@ elif selected_scenario == "scenario_B1":
     )
 
     selected_charging_duration = st.selectbox(
-        "Seleziona la durata di ricarica desiderata:",
+        "Select desired charging duration: [hours]",
         options=sorted(sim_stats_df.charging_duration.unique())
     )
 
