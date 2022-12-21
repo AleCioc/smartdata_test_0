@@ -85,9 +85,14 @@ if selected_scenario == "scenario_A" or selected_scenario == "scenario_B":
         point=alt.OverlayMarkDef(color="red")
     ).encode(
         x=alt.X('lambda', scale=alt.Scale(
-            domain=[unsatisfied_by_n_vehicles["lambda"].min(), unsatisfied_by_n_vehicles["lambda"].max()]
+            domain=[
+                unsatisfied_by_n_vehicles["lambda"].min(),
+                unsatisfied_by_n_vehicles["lambda"].max()
+            ]
         )),
-        y='percentage_unsatisfied',
+        y=alt.Y('percentage_unsatisfied', scale=alt.Scale(
+            domain=[0, 100]
+        )),
         color="n_vehicles_sim",
         tooltip=["lambda", "percentage_unsatisfied", "n_vehicles_sim"]
     ).properties(
@@ -105,11 +110,81 @@ if selected_scenario == "scenario_A" or selected_scenario == "scenario_B":
 
 elif selected_scenario == "scenario_B1":
 
-    sim_stats_df.charging_duration = sim_stats_df.charging_duration / 3600
+    st.subheader("Unsatisfied Demand [%] VS Charging frequency")
 
-    unsatisfied_by_charging_duration = sim_stats_df[[
-        "charging_duration", "percentage_unsatisfied", "n_vehicles_sim"
-    ]]
+    sim_stats_df.charging_duration = sim_stats_df.charging_duration / 3600
+    sim_stats_df["n_charges_per_100_bookings"] = sim_stats_df.n_charges / sim_stats_df.n_bookings * 100
+
+    x_feature = st.selectbox(
+        "Seleziona parametro da inserire sull'asse X:",
+        options=["n_charges_per_100_bookings", "fuel_capacity"]
+    )
+
+    selected_charging_duration = st.selectbox(
+        "Seleziona la durata di ricarica desiderata:",
+        options=sorted(sim_stats_df.charging_duration.unique())
+    )
+
+    unsatisfied_by_charging_frequency = sim_stats_df.loc[
+        sim_stats_df.charging_duration == selected_charging_duration, [
+            x_feature, "percentage_unsatisfied", "n_vehicles_sim"
+        ]
+    ]
+
+    with st.expander("Click to see the dataframe used for the plot"):
+        st.dataframe(unsatisfied_by_charging_frequency)
+
+        @st.cache
+        def convert_df(df):
+            # IMPORTANT: Cache the conversion to prevent computation on every rerun
+            return df.to_csv().encode('utf-8')
+
+
+        csv = convert_df(unsatisfied_by_charging_frequency)
+        st.download_button(
+            label="Download data as CSV",
+            data=csv,
+            file_name='unsatisfied_by_charging_frequency.csv',
+            mime='text/csv',
+        )
+
+    altair_fig = alt.Chart(unsatisfied_by_charging_frequency).mark_line(
+        point=alt.OverlayMarkDef(color="red")
+    ).encode(
+        x=alt.X(x_feature, scale=alt.Scale(
+            domain=[unsatisfied_by_charging_frequency[x_feature].min(),
+                    unsatisfied_by_charging_frequency[x_feature].max()]
+        )),
+        y=alt.Y('percentage_unsatisfied', scale=alt.Scale(
+            domain=[0, 100]
+        )),
+        color="n_vehicles_sim",
+        tooltip=[x_feature, "percentage_unsatisfied", "n_vehicles_sim"]
+    ).properties(
+        title="Unsatisfied Demand [%]",
+        height=300
+    ).interactive()
+    altair_fig.configure_title(
+        fontSize=20,
+        # font='Courier',
+        anchor='start',
+        color='black'
+    )
+
+    st.altair_chart(altair_fig, use_container_width=True)
+
+    st.subheader("Unsatisfied Demand [%] VS Charging Duration")
+
+    selected_fuel_capacity = st.selectbox(
+        "Seleziona la capacità del 'serbatoio' desiderata:",
+        options=sorted(sim_stats_df.fuel_capacity.unique())
+    )
+
+    unsatisfied_by_charging_duration = sim_stats_df.loc[
+        sim_stats_df.fuel_capacity == selected_fuel_capacity, [
+            "charging_duration", "percentage_unsatisfied", "n_vehicles_sim"
+        ]
+    ]
 
     with st.expander("Click to see the dataframe used for the plot"):
         st.dataframe(unsatisfied_by_charging_duration)
@@ -131,11 +206,13 @@ elif selected_scenario == "scenario_B1":
     altair_fig = alt.Chart(unsatisfied_by_charging_duration).mark_line(
         point=alt.OverlayMarkDef(color="red")
     ).encode(
-        x=alt.X('charging_duration', scale=alt.Scale(
+        x=alt.X("charging_duration", scale=alt.Scale(
             domain=[unsatisfied_by_charging_duration["charging_duration"].min(),
                     unsatisfied_by_charging_duration["charging_duration"].max()]
         )),
-        y='percentage_unsatisfied',
+        y=alt.Y('percentage_unsatisfied', scale=alt.Scale(
+            domain=[0, 100]
+        )),
         color="n_vehicles_sim",
         tooltip=["charging_duration", "percentage_unsatisfied", "n_vehicles_sim"]
     ).properties(
@@ -150,3 +227,41 @@ elif selected_scenario == "scenario_B1":
     )
 
     st.altair_chart(altair_fig, use_container_width=True)
+
+    st.subheader("Unsatisfied Demand [%] VS Charging Duration and Frequency")
+
+    selected_n_vehicles = st.selectbox(
+        "Seleziona il numero di veicoli:",
+        options=sorted(sim_stats_df.n_vehicles_sim.unique())
+    )
+
+    satisfied_by_charging_params = sim_stats_df.loc[
+        sim_stats_df.n_vehicles_sim == selected_n_vehicles,
+        ["charging_duration", "fuel_capacity", "percentage_satisfied"]
+    ]
+
+    satisfied_by_charging_params["charging_duration"] = satisfied_by_charging_params.charging_duration.apply(
+        lambda x: "Duration = " + str(x)
+    )
+
+    satisfied_by_charging_params["fuel_capacity"] = satisfied_by_charging_params.fuel_capacity.apply(
+        lambda x: "Capacity = " + str(x)
+    )
+
+    satisfied_by_charging_params = pd.pivot_table(
+        satisfied_by_charging_params,
+        values="percentage_satisfied",
+        index="charging_duration",
+        columns="fuel_capacity"
+    )
+
+    satisfied_by_charging_params_styled = satisfied_by_charging_params[[
+        "Capacity = " + str(i) for i in range(10, 101, 10)
+    ]].copy()
+
+    satisfied_by_charging_params_styled = satisfied_by_charging_params_styled.style.background_gradient(
+        cmap='RdYlGn', axis=1,
+        vmin=0, vmax=100
+    )
+
+    satisfied_by_charging_params_styled

@@ -2,12 +2,11 @@
 year_energymix,['2023']
 engine_type,['gasoline']
 fuel_capacity,[5]
-consumption,[10000]
+vehicle_efficiency,[10000]
 n_seats,[5]
 vehicle_model_name,['my_vehicle']
-vehicles_config_mode,['sim_config']
-n_vehicles,"[1, 2, 3, 4]"
-vehicles_initial_placement,['random_greedy']
+vehicles_config_mode,['vehicles_zones']
+vehicles_zones,"[frozenset({(0, 0)}), frozenset({(1, 1), (0, 0)}), frozenset({(1, 1), (2, 2), (0, 0)}), frozenset({(1, 1), (3, 3), (2, 2), (0, 0)})]"
 charging_config_mode,['sim_config']
 n_workers,[1]
 distributed_cps,[False]
